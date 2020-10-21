@@ -1,17 +1,62 @@
-<h2>Rectangle Creator</h2>
-<p>Count: <input id="count" value="5"></p>
-<button id="create">Create</button>
-<button id="cancel">Cancel</button>
+<style>
+</style>
+<button id="process">Process</button>
+<img id="image" style="display: none;" />
+<canvas id="canvas" />
 <script>
 
-document.getElementById('create').onclick = () => {
-  const textbox = document.getElementById('count');
-  const count = parseInt(textbox.value, 10);
-  parent.postMessage({ pluginMessage: { type: 'create-rectangles', count } }, '*')
+function _arrayBufferToBase64(buffer) {
+    var binary = '';
+    var bytes = new Uint8Array(buffer);
+    var len = bytes.byteLength;
+    for (var i = 0; i < len; ++i) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
 }
 
-document.getElementById('cancel').onclick = () => {
-  parent.postMessage({ pluginMessage: { type: 'cancel' } }, '*')
+function _drawPoint(x, y, color) {
+  var canvas = document.getElementById('canvas');
+  if (canvas.getContext) {
+    var ctx = canvas.getContext('2d');
+    var circle = new Path2D();
+    circle.arc(x, y, 3, 0, 2 * Math.PI);
+    ctx.fillStyle = color;
+    ctx.fill(circle);
+  }
+}
+
+document.getElementById('process').onclick = () => {
+  parent.postMessage({ pluginMessage: { type: 'process' } }, '*')
+}
+
+document.getElementById('canvas').onclick = (event) => {
+  var x = event.offsetX;
+  var y = event.offsetY;
+  _drawPoint(x, y, "red");
+}
+
+document.getElementById('canvas').oncontextmenu = (event) => {
+  var x = event.offsetX;
+  var y = event.offsetY;
+  _drawPoint(x, y, "blue");
+}
+
+// Create an event handler to receive messages from the main thread
+window.onmessage = async (event) => {
+  let img = document.getElementById("image");
+  img.onload = () => {
+    let c = document.getElementById("canvas");
+    c.width = img.width;
+    c.height = img.height;
+    c.getContext("2d").drawImage(img, 0, 0);
+    parent.postMessage({ pluginMessage: { type: 'resize', width: img.width, height: img.height } }, '*');
+  }
+  // Just get the bytes directly from the pluginMessage since that's
+  // the only type of message we'll receive in this plugin. In more
+  // complex plugins, you'll want to check the type of the message.
+  const bytes = event.data.pluginMessage;
+  img.src = "data:image/png;base64," + _arrayBufferToBase64(bytes);
 }
 
 </script>
