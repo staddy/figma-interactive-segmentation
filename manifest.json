@@ -1,0 +1,7 @@
+{
+  "name": "Interactive Segmentation",
+  "id": "900666433652247056",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html"
+}
