@@ -1,9 +1,16 @@
 <style>
 </style>
 <button id="process">Process</button>
+<button id="undo">Undo</button>
+<button id="clear">Clear</button>
 <img id="image" style="display: none;" />
 <canvas id="canvas" />
 <script>
+
+let points = [];
+let img = document.getElementById("image");
+let canvas = document.getElementById("canvas");
+let ctx = canvas.getContext("2d");
 
 function _arrayBufferToBase64(buffer) {
     var binary = '';
@@ -16,40 +23,55 @@ function _arrayBufferToBase64(buffer) {
 }
 
 function _drawPoint(x, y, color) {
-  var canvas = document.getElementById('canvas');
-  if (canvas.getContext) {
-    var ctx = canvas.getContext('2d');
-    var circle = new Path2D();
-    circle.arc(x, y, 3, 0, 2 * Math.PI);
-    ctx.fillStyle = color;
-    ctx.fill(circle);
+  var circle = new Path2D();
+  circle.arc(x, y, 3, 0, 2 * Math.PI);
+  ctx.fillStyle = color;
+  ctx.fill(circle);
+}
+
+let typeToColor = (type) => type === 0 ? "red" : "blue";
+
+function _addPoint(x_, y_, type_) {
+  points.push({x: x_, y: y_, type: type_});
+  _drawPoint(x_, y_, typeToColor(type_));
+}
+
+function _removePoint() {
+  points.pop();
+  ctx.drawImage(img, 0, 0);
+  for (const i in points) {
+    let p = points[i];
+    _drawPoint(p.x, p.y, typeToColor(p.type));
   }
+}
+
+function _clearPoints() {
+  points = [];
+  ctx.drawImage(img, 0, 0);
 }
 
 document.getElementById('process').onclick = () => {
   parent.postMessage({ pluginMessage: { type: 'process' } }, '*')
 }
 
-document.getElementById('canvas').onclick = (event) => {
-  var x = event.offsetX;
-  var y = event.offsetY;
-  _drawPoint(x, y, "red");
+document.getElementById('undo').onclick = _removePoint;
+
+document.getElementById('clear').onclick = _clearPoints;
+
+canvas.onclick = (event) => {
+  _addPoint(event.offsetX, event.offsetY, 0);
 }
 
-document.getElementById('canvas').oncontextmenu = (event) => {
-  var x = event.offsetX;
-  var y = event.offsetY;
-  _drawPoint(x, y, "blue");
+canvas.oncontextmenu = (event) => {
+  _addPoint(event.offsetX, event.offsetY, 1);
 }
 
 // Create an event handler to receive messages from the main thread
 window.onmessage = async (event) => {
-  let img = document.getElementById("image");
   img.onload = () => {
-    let c = document.getElementById("canvas");
-    c.width = img.width;
-    c.height = img.height;
-    c.getContext("2d").drawImage(img, 0, 0);
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
     parent.postMessage({ pluginMessage: { type: 'resize', width: img.width, height: img.height } }, '*');
   }
   // Just get the bytes directly from the pluginMessage since that's
