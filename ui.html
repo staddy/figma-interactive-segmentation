@@ -1,8 +1,8 @@
 <style>
 </style>
-<button id="process">Process</button>
-<button id="undo">Undo</button>
-<button id="clear">Clear</button>
+<button id="process" class="controls" disabled>Process</button>
+<button id="undo" class="controls" disabled>Undo</button>
+<button id="clear" class="controls" disabled>Clear</button>
 <img id="image" style="display: none;" />
 <canvas id="canvas" />
 <script>
@@ -11,18 +11,50 @@ let points = [];
 let img = document.getElementById("image");
 let canvas = document.getElementById("canvas");
 let ctx = canvas.getContext("2d");
+let controls = document.getElementsByClassName("controls");
+let enabled = false;
 
-function _arrayBufferToBase64(buffer) {
-    var binary = '';
-    var bytes = new Uint8Array(buffer);
-    var len = bytes.byteLength;
-    for (var i = 0; i < len; ++i) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return window.btoa(binary);
+const url = 'http://127.0.0.1:5000/v1.0/removebg'
+const api_key = 'this_is_api_key'
+const hdrs =  {
+                'X-Api-Key': api_key,
+                'Accept': 'application/json'
+              }
+
+function enableControls() {
+  for(let i = 0; i < controls.length; ++i) {
+    controls[i].disabled = false;
+  }
+  enabled = true;
+}
+
+function disableControls() {
+  for(let i = 0; i < controls.length; ++i) {
+    controls[i].disabled = true;
+  }
+  enabled = false;
+}
+
+function sendPoints() {
+  if (!enabled) {
+    return;
+  }
+  let data = new FormData();
+  data.append('points', points)
+
+  fetch(url, { method: 'POST', headers: hdrs, body: data }).then(response => {
+      if(!response.ok) {
+          throw response
+      }
+      // TODO: apply mask from response
+      return response;
+  });
 }
 
 function _drawPoint(x, y, color) {
+  if (!enabled) {
+    return;
+  }
   var circle = new Path2D();
   circle.arc(x, y, 3, 0, 2 * Math.PI);
   ctx.fillStyle = color;
@@ -32,25 +64,40 @@ function _drawPoint(x, y, color) {
 let typeToColor = (type) => type === 0 ? "red" : "blue";
 
 function _addPoint(x_, y_, type_) {
+  if (!enabled) {
+    return;
+  }
   points.push({x: x_, y: y_, type: type_});
   _drawPoint(x_, y_, typeToColor(type_));
+  sendPoints();
 }
 
 function _removePoint() {
+  if (!enabled) {
+    return;
+  }
   points.pop();
   ctx.drawImage(img, 0, 0);
   for (const i in points) {
     let p = points[i];
     _drawPoint(p.x, p.y, typeToColor(p.type));
   }
+  sendPoints();
 }
 
 function _clearPoints() {
+  if (!enabled) {
+    return;
+  }
   points = [];
   ctx.drawImage(img, 0, 0);
+  // TODO: clear mask
 }
 
 document.getElementById('process').onclick = () => {
+  if (!enabled) {
+    return;
+  }
   parent.postMessage({ pluginMessage: { type: 'process' } }, '*')
 }
 
@@ -78,7 +125,24 @@ window.onmessage = async (event) => {
   // the only type of message we'll receive in this plugin. In more
   // complex plugins, you'll want to check the type of the message.
   const bytes = event.data.pluginMessage;
-  img.src = "data:image/png;base64," + _arrayBufferToBase64(bytes);
+  let data = new FormData();
+  let base64 = btoa(new Uint8Array(bytes).reduce((data, byte) => {
+      return data + String.fromCharCode(byte)
+  }, ''));
+
+  data.append('image_file_b64', base64)
+
+  fetch(url, { method: 'POST', headers: hdrs, body: data }).then(response => {
+      if(!response.ok) {
+          throw response
+      }
+      //img.src = "data:image/png;base64," + base64;
+      //enableControls();
+      return response;
+  });
+  // TODO: enable controls only after response
+  img.src = "data:image/png;base64," + base64;
+  enableControls();
 }
 
 </script>
